@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { createInvitation, revokeViewer, type Invitation } from '../api/sessions';
 import { formatClock } from '../lib/geo';
 import { formatCode } from '../lib/invite';
@@ -9,42 +9,95 @@ interface Props {
   peerOnline: boolean;
 }
 
+// El código dura lo mismo que la sesión (la función lo limita al vencimiento de la sesión); sigue siendo de un solo uso.
+const INVITE_TTL_MINUTES = 24 * 60;
+
 export function inviteLink(code: string): string {
   return `${window.location.origin}${import.meta.env.BASE_URL}unirse?codigo=${encodeURIComponent(code)}`;
 }
 
+// Se recuerda el código en este dispositivo para no generar otro (e invalidar el ya enviado) al recargar.
+const storageKey = (sessionId: string) => `rastreo:invitacion:${sessionId}`;
+
+function loadInvitation(sessionId: string): Invitation | null {
+  try {
+    const raw = localStorage.getItem(storageKey(sessionId));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { code: string; expiresAt: string };
+    const expiresAt = new Date(parsed.expiresAt);
+    return expiresAt.getTime() > Date.now() ? { code: parsed.code, expiresAt } : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveInvitation(sessionId: string, invitation: Invitation | null): void {
+  try {
+    if (invitation) localStorage.setItem(storageKey(sessionId), JSON.stringify(invitation));
+    else localStorage.removeItem(storageKey(sessionId));
+  } catch {
+    /* almacenamiento no disponible */
+  }
+}
+
 export function InvitePanel({ sessionId, hasViewer, peerOnline }: Props) {
-  const [invitation, setInvitation] = useState<Invitation | null>(null);
+  const [invitation, setInvitation] = useState<Invitation | null>(() => loadInvitation(sessionId));
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const creating = useRef(false);
 
-  const run = async (action: () => Promise<void>) => {
+  const generate = useCallback(async () => {
+    if (creating.current) return;
+    creating.current = true;
     setBusy(true);
     setMessage(null);
     try {
-      await action();
+      const created = await createInvitation(sessionId, INVITE_TTL_MINUTES);
+      saveInvitation(sessionId, created);
+      setInvitation(created);
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : 'Ocurrió un error');
+      setMessage(err instanceof Error ? err.message : 'No se pudo crear el código');
     } finally {
+      creating.current = false;
       setBusy(false);
     }
-  };
+  }, [sessionId]);
+
+  // Sin nadie unido: el código aparece solo, sin tener que pedirlo.
+  useEffect(() => {
+    if (!hasViewer && !invitation) void generate();
+  }, [hasViewer, invitation, generate]);
+
+  // Cuando alguien se une, el código ya se usó: olvidarlo para generar uno nuevo si esa persona sale.
+  useEffect(() => {
+    if (hasViewer) {
+      saveInvitation(sessionId, null);
+      setInvitation(null);
+    }
+  }, [hasViewer, sessionId]);
 
   if (hasViewer) {
     return (
-      <section className="panel" aria-label="Persona invitada">
+      <section className="card owner-card" aria-label="Persona que te ve">
+        <h2 className="card__title">Quién te ve</h2>
         <p>
-          Otra persona está unida a esta sesión{' '}
+          Una persona está unida{' '}
           <span className={peerOnline ? 'badge badge--ok' : 'badge'}>{peerOnline ? 'conectada' : 'desconectada'}</span>
         </p>
         <button
           type="button"
           className="btn btn--ghost"
           disabled={busy}
-          onClick={() => run(async () => {
-            await revokeViewer(sessionId);
-            setInvitation(null);
-          })}
+          onClick={async () => {
+            setBusy(true);
+            try {
+              await revokeViewer(sessionId);
+            } catch (err) {
+              setMessage(err instanceof Error ? err.message : 'No se pudo revocar el acceso');
+            } finally {
+              setBusy(false);
+            }
+          }}
         >
           Revocar acceso
         </button>
@@ -55,36 +108,61 @@ export function InvitePanel({ sessionId, hasViewer, peerOnline }: Props) {
 
   const share = async (code: string) => {
     const url = inviteLink(code);
-    if (navigator.share) {
-      await navigator.share({ title: 'Rastreo en pareja', text: `Código: ${code}`, url }).catch(() => undefined);
-    } else {
-      await navigator.clipboard.writeText(url);
-      setMessage('Enlace copiado.');
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: 'Rastreo', text: `Código: ${formatCode(code)}`, url });
+      } else {
+        await navigator.clipboard.writeText(url);
+        setMessage('Enlace copiado.');
+      }
+    } catch {
+      /* compartir cancelado */
+    }
+  };
+
+  const copyCode = async (code: string) => {
+    try {
+      await navigator.clipboard.writeText(formatCode(code));
+      setMessage('Código copiado.');
+    } catch {
+      setMessage('No se pudo copiar; escribe el código a mano.');
     }
   };
 
   return (
-    <section className="panel" aria-label="Invitación">
-      <p className="muted">Nadie más está unido. Crea una invitación de un solo uso para la otra persona.</p>
+    <section className="card owner-card invite-card" aria-label="Invitación">
+      <h2 className="card__title">Código para la otra persona</h2>
       {invitation ? (
-        <div className="invite">
+        <>
           <code className="invite__code" aria-label="Código de invitación">
             {formatCode(invitation.code)}
           </code>
-          <p className="muted">Vence a las {formatClock(invitation.expiresAt)}. Solo sirve una vez.</p>
-          <button type="button" className="btn" onClick={() => run(() => share(invitation.code))}>
-            Compartir enlace
+          <p className="muted">
+            Solo sirve una vez. Vence a las {formatClock(invitation.expiresAt)}. La otra persona lo escribe en “Ver la
+            ubicación de alguien”.
+          </p>
+          <div className="button-row">
+            <button type="button" className="btn" onClick={() => share(invitation.code)}>
+              Compartir enlace
+            </button>
+            <button type="button" className="btn btn--ghost" onClick={() => copyCode(invitation.code)}>
+              Copiar código
+            </button>
+          </div>
+          <button type="button" className="link-button" disabled={busy} onClick={() => void generate()}>
+            Generar otro código
           </button>
-        </div>
+        </>
+      ) : (
+        <p role="status" className="muted">
+          {busy ? 'Generando código…' : 'No se pudo generar el código.'}
+        </p>
+      )}
+      {!invitation && !busy ? (
+        <button type="button" className="btn" onClick={() => void generate()}>
+          Reintentar
+        </button>
       ) : null}
-      <button
-        type="button"
-        className={invitation ? 'btn btn--ghost' : 'btn'}
-        disabled={busy}
-        onClick={() => run(async () => setInvitation(await createInvitation(sessionId)))}
-      >
-        {invitation ? 'Generar otro código' : 'Crear invitación'}
-      </button>
       {message ? <p role="status" className="muted">{message}</p> : null}
     </section>
   );

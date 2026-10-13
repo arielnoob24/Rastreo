@@ -17,7 +17,7 @@ import { StatusBanner, type StatusKind } from '../components/StatusBanner';
 import { useGeolocationWatch, type WatchStatus } from '../hooks/useGeolocationWatch';
 import { useNow } from '../hooks/useNow';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
-import { appendToTrail, formatClock, isStale, shouldPublish, type LocationFix } from '../lib/geo';
+import { appendToTrail, formatClock, formatRelativeTime, isStale, shouldPublish, type LocationFix } from '../lib/geo';
 import { forgetSession } from '../lib/recentSession';
 import { ensureSignedIn } from '../lib/firebase';
 
@@ -238,71 +238,112 @@ export function SessionPage() {
   }
 
   const sharingNow = watch.status === 'active' || watch.status === 'requesting' || watch.status === 'error';
+  const errorText =
+    actionError && status !== 'no-access' ? (
+      <p role="alert" className="error-text">
+        {actionError}
+      </p>
+    ) : null;
 
-  return (
-    <main className="page session">
-      <header className="session__header">
-        <Link to="/" className="back">
-          ← Inicio
-        </Link>
-        <h1>{isOwner ? 'Mi ubicación' : 'Ubicación compartida'}</h1>
-        {!ended ? <p className="muted">Vence a las {formatClock(session.expiresAt)}</p> : null}
-      </header>
+  if (isOwner) {
+    return (
+      <main className="page session session--owner">
+        <header className="session__header">
+          <Link to="/" className="back">
+            ← Inicio
+          </Link>
+          <span className="role-chip">Tú compartes</span>
+          <h1>Mi ubicación</h1>
+          {!ended ? <p className="muted">La sesión vence a las {formatClock(session.expiresAt)}</p> : null}
+        </header>
 
-      <div className="session__layout">
-        <div className="session__map">
-          <MapView fix={shownFix} trail={trail} stale={stale} />
-        </div>
+        <div className="owner-layout">
+          <div className="owner-layout__main">
+            <section
+              className={`card owner-card share-control${sharingNow ? ' share-control--on' : ''}`}
+              aria-label="Compartir ubicación"
+            >
+              <StatusBanner kind={status} detail={detail} />
+              {!ended ? (
+                sharingNow ? (
+                  <button type="button" className="share-button share-button--stop" onClick={onStop} disabled={busy}>
+                    Detener
+                  </button>
+                ) : (
+                  <button type="button" className="share-button" onClick={onStart} disabled={busy || !online}>
+                    Iniciar
+                  </button>
+                )
+              ) : null}
+              {!ended ? (
+                <p className="muted share-control__hint">
+                  {sharingNow
+                    ? 'Mantén esta pantalla abierta mientras compartes.'
+                    : 'Pulsa Iniciar para que la otra persona vea dónde estás.'}
+                </p>
+              ) : null}
+              {errorText}
+            </section>
 
-        <aside className="session__side">
-          <StatusBanner kind={status} detail={detail} />
+            {!ended ? (
+              <InvitePanel sessionId={id} hasViewer={Boolean(session.viewerId)} peerOnline={peerOnline} />
+            ) : null}
+          </div>
 
-          {isOwner && !ended ? (
-            <div className="controls">
-              {sharingNow ? (
-                <button type="button" className="btn btn--danger btn--big" onClick={onStop} disabled={busy}>
-                  Detener
-                </button>
-              ) : (
-                <button type="button" className="btn btn--big" onClick={onStart} disabled={busy || !online}>
-                  Iniciar
-                </button>
-              )}
-            </div>
-          ) : null}
+          <div className="owner-layout__aside">
+            <section className="card owner-card" aria-label="Lo que estás enviando">
+              <h2 className="card__title">Lo que estás enviando</h2>
+              <MapView fix={shownFix} trail={trail} stale={stale} size="small" />
+              <LocationPanel fix={shownFix} now={now} />
+            </section>
 
-          {actionError && status !== 'no-access' ? (
-            <p role="alert" className="error-text">
-              {actionError}
-            </p>
-          ) : null}
-
-          <LocationPanel fix={shownFix} now={now} />
-
-          {isOwner && !ended ? (
-            <InvitePanel sessionId={id} hasViewer={Boolean(session.viewerId)} peerOnline={peerOnline} />
-          ) : null}
-
-          {!isOwner && !ended ? (
-            <p className="muted">
-              {peerOnline ? 'La otra persona está conectada.' : 'La otra persona no está conectada ahora.'}
-            </p>
-          ) : null}
-
-          <div className="controls controls--secondary">
-            {isOwner && !ended ? (
+            {!ended ? (
               <button type="button" className="btn btn--ghost" onClick={onEnd} disabled={busy}>
                 Terminar sesión
               </button>
             ) : null}
-            {isViewer && !ended ? (
-              <button type="button" className="btn btn--ghost" onClick={onLeave} disabled={busy}>
-                Salir de la sesión
-              </button>
-            ) : null}
+            <PrivacyNotice />
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  return (
+    <main className="page session session--viewer">
+      <header className="session__header">
+        <Link to="/" className="back">
+          ← Inicio
+        </Link>
+        <span className="role-chip">Solo observas</span>
+        <h1>Ubicación compartida</h1>
+      </header>
+
+      <div className="viewer-layout">
+        <div className="viewer-layout__map">
+          <MapView fix={shownFix} trail={trail} stale={stale} size="large" />
+        </div>
+
+        <aside className="viewer-layout__side">
+          <div className={`last-seen${stale ? ' last-seen--stale' : ''}`}>
+            <span className="last-seen__label">Última actualización</span>
+            <strong className="last-seen__value">
+              {shownFix ? formatRelativeTime(shownFix.capturedAt, now) : '—'}
+            </strong>
+            <span className={`presence${peerOnline ? ' presence--on' : ''}`}>
+              {peerOnline ? 'La otra persona está conectada' : 'La otra persona no está conectada'}
+            </span>
           </div>
 
-          {isOwner ? <PrivacyNotice /> : null}
+          <StatusBanner kind={status} detail={detail} />
+          {errorText}
+          <LocationPanel fix={shownFix} now={now} />
+
+          {!ended ? (
+            <button type="button" className="btn btn--ghost" onClick={onLeave} disabled={busy}>
+              Salir de la sesión
+            </button>
+          ) : null}
         </aside>
       </div>
     </main>

@@ -1,40 +1,44 @@
 ---
 name: firebase-firestore-y-reglas
-description: Modelo de datos en Firestore (sesiones, invitaciones, última ubicación), listeners en tiempo real, reglas de seguridad por integrante, secretos y expiración con TTL. Úsala al tocar firestore.rules, src/api/ o src/lib/firebase.ts.
+description: Modelo de datos en Firestore para compartir con varias personas (users, shares, invitations, locations), consultas array-contains, listeners en tiempo real, reglas por observador, presencia y límites del plan gratuito. Úsala al tocar firestore.rules, src/api/ o src/lib/firebase.ts.
 ---
 
 # Firebase: Firestore, Auth anónima y reglas
 
-## Modelo (`firestore.rules` es la fuente de verdad)
+`plan.md` (sección **Datos en Firebase**) define el modelo objetivo. Hoy está implementado el modelo de dos personas (`sessions`); al migrar, reemplázalo por el de esta skill y actualiza `rules-test/`.
 
-- `sessions/{sid}`: `ownerId`, `viewerId`, `sharing`, `createdAt`, `expiresAt`, `endedAt`, `inviteHash`, `ownerSeen`, `viewerSeen`.
-- `invitations/{sha256(código)}`: `sessionId`, `ownerId`, `expiresAt`, `usedAt`, `usedBy`. El ID es el hash; el código en claro nunca se guarda.
-- `locations/{sid}`: solo la **última** posición (`latitude`, `longitude`, `accuracy`, `altitude`, `altitudeAccuracy`, `capturedAt`, `updatedAt`, `expiresAt`).
+## Modelo objetivo
+
+- `users/{uid}`: `name` (1 a 30 caracteres), `createdAt`.
+- `shares/{uid}`: una por persona que comparte. `ownerId == uid`, `ownerName`, `sharing`, `expiresAt` (opcional, `null` = hasta detener), `viewerIds` (lista, máx. 10), `viewers` (mapa `uid → { name, joinedAt }`).
+- `shares/{uid}/presence/{viewerId}`: `lastSeen`. Va separado para que el latido de un observador no genere lecturas en todos los demás.
+- `invitations/{sha256(código)}`: `ownerId`, `ownerName`, `createdAt`, `expiresAt`, `usedAt`, `usedBy`. El código en claro nunca se guarda.
+- `locations/{uid}`: solo la **última** posición: `latitude`, `longitude`, `accuracy`, `altitude`, `altitudeAccuracy`, `capturedAt`, `updatedAt`, `battery` (opcional).
+
+## Consultas
+
+- Monitoreo: `query(collection(db, 'shares'), where('viewerIds', 'array-contains', uid))`. La regla de `list` debe exigir exactamente esa condición (`request.auth.uid in resource.data.viewerIds`).
+- Luego, un listener `onSnapshot` de `locations/{ownerId}` por cada compartición con `sharing == true`. Abrir y cerrar listeners según cambie la lista; nunca duplicarlos.
+- Quien comparte: `onSnapshot` de su propio `shares/{uid}` y de `presence`.
 
 ## Reglas
 
-- Todo denegado por defecto. Cada colección valida claves permitidas (`keys().hasOnly`), tipos y rangos.
-- Unirse = un **lote** que marca la invitación como usada y asigna `viewerId`. Las reglas usan `get`/`getAfter` para exigir ambas escrituras a la vez; una invitación solo sirve si es la `inviteHash` actual de la sesión, no está usada y no venció.
-- Las invitaciones se leen solo por `get` (no hay `list`): hay que conocer el código.
-- La ubicación solo es legible para integrantes, con la sesión vigente y `sharing == true`. Solo el dueño la escribe, y solo con `sharing == true`.
-- Detener o terminar = lote que actualiza la sesión y **borra** `locations/{sid}`.
-- Tras cambiar `firestore.rules`, ejecutar `npm run test:rules` y añadir un caso por cada regla nueva.
+- Todo denegado por defecto. Validar claves permitidas (`keys().hasOnly`), tipos, rangos y tamaños.
+- `shares/{uid}`: lee el dueño y quien esté en `viewerIds`. El dueño cambia `sharing`, `expiresAt` y puede **quitar** observadores. Un observador solo puede quitarse a sí mismo.
+- Unirse = **lote** que marca la invitación como usada y añade exactamente el `uid` de quien acepta a `viewerIds` y a `viewers`. Las reglas usan `get`/`getAfter` para exigir ambas escrituras, comprueban que la invitación no esté usada ni vencida y que `viewerIds.size() <= 10`.
+- Invitaciones: solo `get` por ID (sin `list`); solo el dueño las crea; una por persona invitada.
+- `locations/{uid}`: lee el dueño y los observadores, solo con `sharing == true` y sin vencer. Solo el dueño escribe, solo con `sharing == true`.
+- **Detener** = lote que pone `sharing: false` y borra `locations/{uid}`.
+- Cada regla nueva lleva su caso en `rules-test/` y debe pasar `npm run test:rules`.
 
-## Tiempo real
+## Límites del plan gratuito (Spark)
 
-- `onSnapshot` en la sesión; el visor solo escucha `locations/{sid}` mientras `sharing` es verdadero (las reglas la deniegan si no).
-- Estado de conexión: `snapshot.metadata.fromCache`.
-- Presencia: latidos `ownerSeen`/`viewerSeen` cada 20 s; "conectado" = latido de menos de 60 s.
-- Cancelar los listeners en el cleanup del efecto para evitar duplicados.
+- 50 000 lecturas y 20 000 escrituras al día. Cada ubicación enviada cuesta 1 escritura y 1 lectura por cada observador conectado.
+- Mantener el límite de envío (5 s o 10 m) y espaciar los latidos de presencia (60 s).
+- Sin facturación no hay TTL ni Cloud Functions: las reglas deben comprobar el vencimiento para que lo vencido sea ilegible.
 
 ## Secretos y configuración
 
 - Las claves `VITE_FIREBASE_*` son públicas por diseño; la protección real son las reglas y la autenticación.
 - Nunca incluir credenciales de cuentas de servicio en el repositorio.
-- Autenticación anónima: una cuenta por navegador. Para probar con dos personas en un mismo equipo, usar perfiles o ventanas de incógnito distintas.
-
-## Expiración
-
-- Las políticas TTL sobre `expiresAt` requieren facturación (Blaze); el proyecto actual no la tiene, así que `firestore.indexes.json` no las declara.
-- El TTL borra con retraso (puede tardar horas): las reglas ya comprueban `expiresAt > request.time`, así que un dato vencido no es legible.
-- Sin Cloud Functions no hay borrado en el servidor si el teléfono desaparece sin pulsar Detener: la ubicación queda ilegible (`sharing` sigue verdadero pero la sesión vence) hasta el TTL. Documentarlo.
+- Autenticación anónima: una cuenta por navegador o app. Para probar con varias personas en un mismo equipo, usar perfiles, ventanas de incógnito o contextos de Playwright distintos.

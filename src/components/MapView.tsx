@@ -9,10 +9,10 @@ const TILE_ATTRIBUTION =
   '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
 
 // Icono propio: los iconos por defecto de Leaflet no resuelven sus imágenes con bundlers.
-const markerIcon = (stale: boolean) =>
+const markerIcon = (stale: boolean, size: 'small' | 'large') =>
   L.divIcon({
     className: '',
-    html: `<span class="map-marker${stale ? ' map-marker--stale' : ''}"></span>`,
+    html: `<span class="map-marker map-marker--${size}${stale ? ' map-marker--stale' : ''}"></span>`,
     iconSize: [22, 22],
     iconAnchor: [11, 11],
   });
@@ -46,21 +46,25 @@ interface Props {
   fix: LocationFix | null;
   trail: Array<[number, number]>;
   stale: boolean;
+  /** small: vista previa de quien comparte; large: mapa principal de quien observa. */
+  size?: 'small' | 'large';
 }
 
-export function MapView({ fix, trail, stale }: Props) {
+export function MapView({ fix, trail, stale, size = 'large' }: Props) {
   const [follow, setFollow] = useState(true);
   const position: [number, number] | null = fix ? [fix.latitude, fix.longitude] : null;
+  // Verde azulado para quien comparte; índigo para quien observa (mismo color que el resto de su pantalla).
+  const color = size === 'small' ? '#0f766e' : '#4f46e5';
 
   return (
-    <div className="map-wrap">
-      <MapContainer center={position ?? DEFAULT_CENTER} zoom={position ? 16 : 2} className="map" scrollWheelZoom>
+    <div className={`map-wrap map-wrap--${size}`}>
+      <MapContainer center={position ?? DEFAULT_CENTER} zoom={position ? 16 : 2} className={`map map--${size}`} scrollWheelZoom>
         <TileLayer url={TILE_URL} attribution={TILE_ATTRIBUTION} maxZoom={19} />
-        {trail.length > 1 ? <Polyline positions={trail} pathOptions={{ color: '#0f766e', weight: 4, opacity: 0.6 }} /> : null}
+        {trail.length > 1 ? <Polyline positions={trail} pathOptions={{ color, weight: 4, opacity: 0.6 }} /> : null}
         {position && fix?.accuracy ? (
-          <Circle center={position} radius={fix.accuracy} pathOptions={{ color: '#0f766e', weight: 1, fillOpacity: 0.12 }} />
+          <Circle center={position} radius={fix.accuracy} pathOptions={{ color, weight: 1, fillOpacity: 0.12 }} />
         ) : null}
-        {position ? <Marker position={position} icon={markerIcon(stale)} /> : null}
+        {position ? <Marker position={position} icon={markerIcon(stale, size)} /> : null}
         <FollowPosition position={position} follow={follow} onUserMove={() => setFollow(false)} />
       </MapContainer>
       {position && !follow ? (

@@ -23,9 +23,10 @@ test('dos personas: invitación, ubicación en vivo, detener y revocar', async (
   await expect(owner.getByText('No estás compartiendo tu ubicación')).toBeVisible();
 
   // 2. Crea la invitación.
-  await owner.getByRole('button', { name: 'Crear invitación' }).click();
+  // El código aparece solo al entrar a la sesión.
   const codeText = (await owner.getByLabel('Código de invitación').textContent()) ?? '';
   expect(codeText).toMatch(/^[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}$/);
+  if (process.env.SHOTS) await owner.screenshot({ path: `${process.env.SHOTS}/codigo.png`, fullPage: true });
 
   // 3. Un ajeno no puede abrir la sesión.
   const stranger = await strangerCtx.newPage();
@@ -55,6 +56,11 @@ test('dos personas: invitación, ubicación en vivo, detener y revocar', async (
   // 7. Se mueve: el visor lo recibe en vivo.
   await ownerCtx.setGeolocation(B);
   await expect(viewer.getByText('10.001000° N')).toBeVisible({ timeout: 20_000 });
+  if (process.env.SHOTS) {
+    await owner.waitForTimeout(1500);
+    await owner.screenshot({ path: `${process.env.SHOTS}/mi-ubicacion.png`, fullPage: true });
+    await viewer.screenshot({ path: `${process.env.SHOTS}/ubicacion-compartida.png`, fullPage: true });
+  }
 
   // 8. Detener: el visor deja de ver la ubicación.
   await owner.getByRole('button', { name: 'Detener' }).click();
