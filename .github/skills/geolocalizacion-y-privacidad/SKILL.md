@@ -25,7 +25,7 @@ description: Captura de ubicación en primer plano (watchPosition) y en segundo 
 
 ## Envío
 
-- Publicar si pasaron 5 s o más, o si el desplazamiento supera ~10 m (`shouldPublish` en `src/lib/geo.ts`).
+- Publicar si pasaron 5 s o más, o si el desplazamiento supera ~10 m (`shouldPublish` en `shared/lib/geo.ts`).
 - Si la persona está quieta, espaciar los envíos (por ejemplo cada 60 s) para ahorrar batería y cuota de Firestore.
 - Considerar obsoleta una ubicación sin actualizar durante más de 60 s (`isStale`).
 

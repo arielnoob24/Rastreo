@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { acceptInvitation } from '../api/sessions';
-import { rememberSession } from '../lib/recentSession';
-import { ensureSignedIn, isFirebaseConfigured } from '../lib/firebase';
+import { acceptInvitation } from '@shared/api/sessions';
+import { ensureSignedIn, isFirebaseConfigured } from '@shared/lib/firebase';
+import { formatCode, normalizeCode } from '@shared/lib/invite';
+import { rememberSession } from '@shared/lib/recentSession';
 
 export function JoinPage() {
   const [params] = useSearchParams();
@@ -18,7 +19,7 @@ export function JoinPage() {
     try {
       await ensureSignedIn();
       const sessionId = await acceptInvitation(code);
-      rememberSession(sessionId);
+      rememberSession('monitoreo', sessionId);
       navigate(`/sesion/${sessionId}`, { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Invitación inválida o vencida');
@@ -36,7 +37,7 @@ export function JoinPage() {
           quitarte el acceso en cualquier momento.
         </p>
         <p>
-          Código: <code>{code || '—'}</code>
+          Código: <code>{code ? formatCode(normalizeCode(code)) : '—'}</code>
         </p>
         <button type="button" className="btn" onClick={onAccept} disabled={busy || !code || !isFirebaseConfigured}>
           {busy ? 'Uniendo…' : 'Unirme'}

@@ -12,9 +12,10 @@ Un navegador suspende la página al bloquear la pantalla o cambiar de app. Para 
 ## Configuración
 
 - Dependencias: `@capacitor/core`, `@capacitor/cli`, `@capacitor/android`, y el plugin `@capacitor-community/background-geolocation`.
-- `capacitor.config.ts`: `appId` (por ejemplo `com.rastreo.app`), `appName`, `webDir: 'dist'`.
-- La build para la app usa `BASE_PATH=/` (no `/Rastreo/` de GitHub Pages).
-- Flujo: `npm run build` → `npx cap sync android` → abrir en Android Studio o `./gradlew assembleDebug` para el APK.
+- Solo se empaqueta la **app de ubicación** (`apps/compartir`); la de monitoreo sigue siendo web.
+- `capacitor.config.ts`: `appId` (por ejemplo `com.rastreo.compartir`), `appName: 'Rastreo · Compartir'`, `webDir: 'dist/compartir'`.
+- La build para la app nativa usa base `/` (no `/Rastreo/compartir/` de GitHub Pages); las rutas ya usan `HashRouter`. El enlace de invitación debe apuntar a la URL pública de la app de monitoreo (`__MONITOREO_URL__` absoluto).
+- Flujo: build de la app de ubicación → `npx cap sync android` → abrir en Android Studio o `./gradlew assembleDebug` para el APK.
 - El service worker de la PWA no es necesario dentro de la app; no registrarlo cuando `Capacitor.isNativePlatform()` es verdadero.
 
 ## Uso del plugin

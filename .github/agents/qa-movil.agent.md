@@ -17,7 +17,7 @@ Antes de diseñar o ejecutar pruebas, lee y aplica:
 
 ## Área de trabajo
 
-- `src/**/*.test.ts(x)`, `rules-test/`, `e2e/`, `e2e-flow/`, configuraciones de Playwright y Vitest, `docs/pruebas-dispositivos.md`.
+- `shared/**/*.test.ts(x)`, `apps/**/*.test.ts(x)`, `rules-test/`, `e2e/`, `e2e-flow/`, configuraciones de Playwright y Vitest, `docs/pruebas-dispositivos.md`.
 - Si encuentras un defecto fuera de las pruebas, descríbelo con pasos para reproducirlo y asígnalo al agente responsable en lugar de corregirlo tú.
 
 ## Qué debes verificar

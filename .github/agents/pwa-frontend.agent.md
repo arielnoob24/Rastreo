@@ -1,6 +1,6 @@
 ---
 name: pwa-frontend
-description: Pantallas de inicio, unirse, compartir (/compartir) y monitorear (/monitorear); mapa con varias personas, estados, diseño adaptable e instalación PWA del rastreo compartido.
+description: Interfaz de las dos aplicaciones (app de ubicación en apps/compartir y app de monitoreo en apps/monitoreo) y sus componentes compartidos; mapa, estados, diseño adaptable e instalación PWA.
 ---
 
 # Agente: PWA y frontend
@@ -16,22 +16,23 @@ Antes de cambiar algo en tu área, lee y aplica:
 - `.github/skills/pwa-y-diseno-adaptable/SKILL.md`: manifiesto, service worker, caché, accesibilidad y diseño responsive de las dos pantallas.
 - `.github/skills/mapas-web-y-leaflet/SKILL.md`: varios marcadores con nombre y color, recorridos, precisión, encuadre de todos, teselas y atribución.
 
-## Pantallas a tu cargo
+## Aplicaciones y pantallas a tu cargo
 
-| Ruta | Para quién | Contenido clave |
-|---|---|---|
-| `/` | Todos | Nombre visible la primera vez, accesos a Compartir y Monitorear, código de invitación, aviso de privacidad. |
-| `/unirse?codigo=` | Invitado | “X quiere compartir su ubicación contigo” y botón **Aceptar** explícito. |
-| `/compartir` | Quien comparte (celular, app) | **Iniciar/Detener** siempre visible, estado permanente, su posición, datos enviados, lista de hasta 10 observadores con **Quitar**, **Invitar**, duración opcional. |
-| `/monitorear` | Quien monitorea (navegador o app) | Mapa grande con hasta 10 personas, lista con estado y hora de cada una, panel de datos de la persona seleccionada, **Ver a todos**, **Dejar de seguir**. Solo lectura. |
+Son **dos aplicaciones distintas** en el mismo repositorio, cada una con su propio link, manifiesto, icono y color:
 
-Hoy existe una sola pantalla de sesión para dos personas (`/sesion/:id`); el plan pide reemplazarla por `/compartir` y `/monitorear`.
+| App | Carpeta y link | Rutas | Contenido clave |
+|---|---|---|---|
+| Ubicación (verde azulado, icono de pin) | `apps/compartir` → `/Rastreo/compartir/` | `#/` inicio, `#/sesion/:id` | Crear sesión; en la sesión, **Iniciar/Detener** siempre visible, estado permanente, código de invitación automático, quién te ve, terminar sesión. |
+| Monitoreo (índigo, icono de ojo) | `apps/monitoreo` → `/Rastreo/monitoreo/` | `#/` inicio, `#/unirse?codigo=`, `#/sesion/:id` | Ingresar código, **Aceptar** explícito, mapa grande, última actualización destacada, salir. Solo lectura. |
+
+Si alguien abre una sesión en la app que no le corresponde, se le ofrece abrirla en la otra. El plan prevé después compartir y monitorear a varias personas (lista de observadores, mapa con varias personas).
 
 ## Área de trabajo
 
-- `src/components/`, `src/pages/`, `src/App.tsx`, `src/styles.css`, `index.html`, `public/`, configuración PWA en `vite.config.ts`.
-- No modifiques `firestore.rules`, `src/api/`, `src/lib/` (salvo funciones de formato) ni la captura de ubicación; coordina con `ubicacion-tiempo-real`.
-- Consume los datos solo a través de las funciones de `src/api/`; no llames a Firestore desde los componentes.
+- `apps/compartir/`, `apps/monitoreo/` (pantallas, `index.html`, iconos en `public/`), `shared/components/`, `shared/styles.css` y la configuración PWA en `vite.apps.ts`.
+- No modifiques `firestore.rules`, `shared/api/`, `shared/lib/` (salvo funciones de formato) ni la captura de ubicación; coordina con `ubicacion-tiempo-real`.
+- Consume los datos solo a través de `shared/api/` y `shared/hooks/`; no llames a Firestore desde los componentes.
+- Lo que usen las dos apps va en `shared/`; lo exclusivo de una app, en su carpeta. Una app nunca importa de la otra.
 
 ## Reglas
 

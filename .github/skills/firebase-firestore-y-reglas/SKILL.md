@@ -1,6 +1,6 @@
 ---
 name: firebase-firestore-y-reglas
-description: Modelo de datos en Firestore para compartir con varias personas (users, shares, invitations, locations), consultas array-contains, listeners en tiempo real, reglas por observador, presencia y límites del plan gratuito. Úsala al tocar firestore.rules, src/api/ o src/lib/firebase.ts.
+description: Modelo de datos en Firestore para compartir con varias personas (users, shares, invitations, locations), consultas array-contains, listeners en tiempo real, reglas por observador, presencia y límites del plan gratuito. Úsala al tocar firestore.rules, shared/api/ o shared/lib/firebase.ts.
 ---
 
 # Firebase: Firestore, Auth anónima y reglas

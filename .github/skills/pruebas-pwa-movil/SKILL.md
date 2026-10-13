@@ -7,10 +7,10 @@ description: Niveles de prueba, matriz de dispositivos, envío en segundo plano 
 
 ## Niveles
 
-- **Unitarias (Vitest + Testing Library)**: reglas puras de `src/lib/` y componentes de estado. `npm test`.
+- **Unitarias (Vitest + Testing Library)**: reglas puras de `shared/lib/` y componentes de estado. `npm test`.
 - **Reglas de Firestore**: `npm run test:rules` (emulador; requiere Java 21+). Cubrir: máximo de 10 observadores, unirse solo con invitación, quitar observador, observador que se quita a sí mismo, lectura denegada a no invitados.
-- **Flujo con varias personas**: `npm run test:flow` (emuladores de Auth y Firestore). Usar un contexto de Playwright por persona: 1 que comparte con 3 observadores y 1 observador que sigue a 3 personas.
-- **E2E del build**: `npm run test:e2e`, proyectos de escritorio (Chromium) y móvil (Pixel 7).
+- **Flujo entre las dos apps**: `npm run test:flow` (emuladores de Auth y Firestore; app de ubicación en el puerto 5173 y de monitoreo en el 5174). Usar un contexto de Playwright por persona: 1 que comparte con 3 observadores y 1 observador que sigue a 3 personas.
+- **E2E del build**: `npm run test:e2e` sobre la portada y las dos apps, en escritorio (Chromium) y móvil (Pixel 7).
 - **App Android**: pruebas manuales con el APK en celulares reales (el segundo plano no se puede simular en el navegador).
 
 ## Simulación en navegador

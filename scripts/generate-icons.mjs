@@ -1,11 +1,8 @@
-// Genera los iconos PNG de la PWA sin dependencias: un pin de ubicación sobre fondo de marca.
+// Genera los iconos PNG de cada app sin dependencias.
+// Compartir: pin de ubicación sobre verde azulado. Monitoreo: ojo sobre índigo.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { deflateSync } from 'node:zlib';
 
-const OUT = new URL('../public/icons/', import.meta.url);
-mkdirSync(OUT, { recursive: true });
-
-const BRAND = [15, 118, 110];
 const WHITE = [255, 255, 255];
 
 const crcTable = Array.from({ length: 256 }, (_, n) => {
@@ -40,7 +37,16 @@ function pinCoverage(x, y) {
   return (inHead || inTip) && !inHole;
 }
 
-function render(size, { maskable }) {
+/** Cobertura del ojo: lente horizontal con iris hueco y pupila. */
+function eyeCoverage(x, y) {
+  const inLens = Math.hypot(x, y - 0.55) <= 0.95 && Math.hypot(x, y + 0.55) <= 0.95;
+  const d = Math.hypot(x, y);
+  const inIris = d <= 0.34;
+  const inPupil = d <= 0.17;
+  return (inLens && !inIris) || inPupil;
+}
+
+function render(size, { maskable, shape, color }) {
   const scale = maskable ? 0.62 : 0.8; // zona segura del icono maskable
   const samples = 4;
   const raw = Buffer.alloc((size * 3 + 1) * size);
@@ -52,12 +58,12 @@ function render(size, { maskable }) {
         for (let sx = 0; sx < samples; sx++) {
           const x = ((px + (sx + 0.5) / samples) / size) * 2 - 1;
           const y = ((py + (sy + 0.5) / samples) / size) * 2 - 1;
-          if (pinCoverage(x / scale, y / scale)) hits++;
+          if (shape(x / scale, y / scale)) hits++;
         }
       }
       const a = hits / (samples * samples);
       const o = py * (size * 3 + 1) + 1 + px * 3;
-      for (let c = 0; c < 3; c++) raw[o + c] = Math.round(BRAND[c] * (1 - a) + WHITE[c] * a);
+      for (let c = 0; c < 3; c++) raw[o + c] = Math.round(color[c] * (1 - a) + WHITE[c] * a);
     }
   }
   const ihdr = Buffer.alloc(13);
@@ -73,11 +79,27 @@ function render(size, { maskable }) {
   ]);
 }
 
-writeFileSync(new URL('icon-192.png', OUT), render(192, { maskable: false }));
-writeFileSync(new URL('icon-512.png', OUT), render(512, { maskable: false }));
-writeFileSync(new URL('icon-maskable-512.png', OUT), render(512, { maskable: true }));
-writeFileSync(
-  new URL('favicon.svg', OUT),
-  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#0f766e"/><path d="M32 12a14 14 0 0 0-14 14c0 10 14 26 14 26s14-16 14-26a14 14 0 0 0-14-14zm0 19a5 5 0 1 1 0-10 5 5 0 0 1 0 10z" fill="#fff"/></svg>\n`,
-);
-console.log('Iconos generados en public/icons/');
+const APPS = {
+  compartir: {
+    shape: pinCoverage,
+    color: [15, 118, 110],
+    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#0f766e"/><path d="M32 12a14 14 0 0 0-14 14c0 10 14 26 14 26s14-16 14-26a14 14 0 0 0-14-14zm0 19a5 5 0 1 1 0-10 5 5 0 0 1 0 10z" fill="#fff"/></svg>
+`,
+  },
+  monitoreo: {
+    shape: eyeCoverage,
+    color: [79, 70, 229],
+    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#4f46e5"/><path d="M8 32s9-14 24-14 24 14 24 14-9 14-24 14S8 32 8 32z" fill="#fff"/><circle cx="32" cy="32" r="9" fill="#4f46e5"/><circle cx="32" cy="32" r="4.5" fill="#fff"/></svg>
+`,
+  },
+};
+
+for (const [app, spec] of Object.entries(APPS)) {
+  const out = new URL(`../apps/${app}/public/icons/`, import.meta.url);
+  mkdirSync(out, { recursive: true });
+  writeFileSync(new URL('icon-192.png', out), render(192, { maskable: false, ...spec }));
+  writeFileSync(new URL('icon-512.png', out), render(512, { maskable: false, ...spec }));
+  writeFileSync(new URL('icon-maskable-512.png', out), render(512, { maskable: true, ...spec }));
+  writeFileSync(new URL('favicon.svg', out), spec.svg);
+}
+console.log('Iconos generados en apps/*/public/icons/');

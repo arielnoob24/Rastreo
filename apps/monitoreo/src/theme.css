@@ -1,0 +1,20 @@
+/* La app de monitoreo usa índigo como color de marca; la de ubicación, verde azulado. */
+:root {
+  --brand: #4f46e5;
+  --brand-strong: #4338ca;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --brand: #a5b4fc;
+    --brand-strong: #c7d2fe;
+  }
+
+  .btn {
+    color: #1e1b4b;
+  }
+}
+
+:focus-visible {
+  outline-color: var(--brand);
+}

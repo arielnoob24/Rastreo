@@ -1,17 +1,17 @@
 ---
 name: mapas-web-y-leaflet
-description: Mapas con React Leaflet para una o varias personas - marcadores con nombre y color, recorridos, círculo de precisión, selección, encuadre de todos, teselas y atribución. Úsala al tocar src/components/ de mapas.
+description: Mapas con React Leaflet para una o varias personas - marcadores con nombre y color, recorridos, círculo de precisión, selección, encuadre de todos, teselas y atribución. Úsala al tocar shared/components/MapView.tsx.
 ---
 
 # Mapas web con Leaflet
 
 ## Inicialización
 
-- Importar `leaflet/dist/leaflet.css` una sola vez (en `src/main.tsx`).
+- Importar `leaflet/dist/leaflet.css` una sola vez, en el `main.tsx` de cada app (`apps/compartir/src/main.tsx` y `apps/monitoreo/src/main.tsx`).
 - El contenedor del mapa necesita una altura explícita en CSS; si no, no se ve.
 - Los iconos por defecto de Leaflet fallan con bundlers: usar `L.divIcon` propio.
 
-## Varias personas (pantalla de monitoreo)
+## Varias personas (app de monitoreo)
 
 - Un marcador por persona, con su **inicial o nombre** y un **color** estable derivado de su `uid` (misma persona, mismo color siempre). Paleta de hasta 10 colores distinguibles en modo claro y oscuro.
 - El color no puede ser la única señal: mostrar el nombre en la etiqueta del marcador o al lado.
@@ -29,9 +29,13 @@ description: Mapas con React Leaflet para una o varias personas - marcadores con
 
 - El recorrido se mantiene **solo en memoria** en el cliente (máximo ~500 puntos por persona) y se descarta al dejar de compartir. No se guarda historial en la base de datos salvo que el plan lo apruebe.
 
-## Pantalla de compartir
+## App de ubicación
 
 - Mapa pequeño con la posición propia; no ocupar el espacio de los controles **Iniciar/Detener**.
+
+## Colores por app
+
+- `MapView` recibe `size="small"` en la app de ubicación (vista previa, verde azulado) y `size="large"` en la de monitoreo (mapa principal, índigo).
 
 ## Teselas y atribución
 

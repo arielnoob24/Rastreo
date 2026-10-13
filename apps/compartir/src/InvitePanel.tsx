@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { createInvitation, revokeViewer, type Invitation } from '../api/sessions';
-import { formatClock } from '../lib/geo';
-import { formatCode } from '../lib/invite';
+import { createInvitation, revokeViewer, type Invitation } from '@shared/api/sessions';
+import { inviteLink } from '@shared/lib/appLinks';
+import { formatClock } from '@shared/lib/geo';
+import { formatCode } from '@shared/lib/invite';
 
 interface Props {
   sessionId: string;
@@ -11,10 +12,6 @@ interface Props {
 
 // El código dura lo mismo que la sesión (la función lo limita al vencimiento de la sesión); sigue siendo de un solo uso.
 const INVITE_TTL_MINUTES = 24 * 60;
-
-export function inviteLink(code: string): string {
-  return `${window.location.origin}${import.meta.env.BASE_URL}unirse?codigo=${encodeURIComponent(code)}`;
-}
 
 // Se recuerda el código en este dispositivo para no generar otro (e invalidar el ya enviado) al recargar.
 const storageKey = (sessionId: string) => `rastreo:invitacion:${sessionId}`;
@@ -138,8 +135,8 @@ export function InvitePanel({ sessionId, hasViewer, peerOnline }: Props) {
             {formatCode(invitation.code)}
           </code>
           <p className="muted">
-            Solo sirve una vez. Vence a las {formatClock(invitation.expiresAt)}. La otra persona lo escribe en “Ver la
-            ubicación de alguien”.
+            Solo sirve una vez. Vence a las {formatClock(invitation.expiresAt)}. La otra persona lo escribe en la app de
+            monitoreo.
           </p>
           <div className="button-row">
             <button type="button" className="btn" onClick={() => share(invitation.code)}>

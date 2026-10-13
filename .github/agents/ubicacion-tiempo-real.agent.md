@@ -20,8 +20,8 @@ Antes de cambiar algo en tu área, lee y aplica:
 ## Área de trabajo
 
 - `firestore.rules`, `firestore.indexes.json`, `firebase.json`, `rules-test/`.
-- `src/lib/`, `src/api/`, `src/hooks/` (incluida la abstracción que elige entre `watchPosition()` y el plugin nativo).
-- `capacitor.config.ts` y la carpeta `android/` (y `ios/` si se aprueba).
+- `shared/lib/`, `shared/api/`, `shared/hooks/` (incluida la abstracción que elige entre `watchPosition()` y el plugin nativo).
+- `capacitor.config.ts` y la carpeta `android/` (y `ios/` si se aprueba): solo se empaqueta la **app de ubicación** (`apps/compartir`).
 - No cambies estilos ni maquetación; coordina con `pwa-frontend`.
 
 ## Reglas

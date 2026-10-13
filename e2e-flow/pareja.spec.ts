@@ -3,8 +3,10 @@ import { expect, test } from '@playwright/test';
 // Coordenadas ficticias.
 const A = { latitude: 10.0, longitude: 20.0, accuracy: 12 };
 const B = { latitude: 10.001, longitude: 20.002, accuracy: 9 };
+const COMPARTIR = 'http://localhost:5173/';
+const MONITOREO = 'http://localhost:5174/';
 
-test('dos personas: invitación, ubicación en vivo, detener y revocar', async ({ browser }) => {
+test('app de ubicación + app de monitoreo: invitación, ubicación en vivo, detener y revocar', async ({ browser }) => {
   const ownerCtx = await browser.newContext({
     permissions: ['geolocation'],
     geolocation: A,
@@ -15,8 +17,8 @@ test('dos personas: invitación, ubicación en vivo, detener y revocar', async (
   const owner = await ownerCtx.newPage();
   const viewer = await viewerCtx.newPage();
 
-  // 1. La persona que comparte crea la sesión.
-  await owner.goto('/');
+  // 1. La persona que comparte crea la sesión en la app de ubicación.
+  await owner.goto(COMPARTIR);
   await owner.getByRole('button', { name: 'Crear sesión' }).click();
   await expect(owner).toHaveURL(/\/sesion\//);
   const sessionUrl = owner.url();
@@ -33,15 +35,15 @@ test('dos personas: invitación, ubicación en vivo, detener y revocar', async (
   await stranger.goto(sessionUrl);
   await expect(stranger.getByText('No tienes acceso a esta sesión')).toBeVisible();
 
-  // 4. La otra persona se une con el código.
-  await viewer.goto(`/unirse?codigo=${encodeURIComponent(codeText)}`);
+  // 4. La otra persona se une con el código en la app de monitoreo.
+  await viewer.goto(`${MONITOREO}#/unirse?codigo=${encodeURIComponent(codeText)}`);
   await viewer.getByRole('button', { name: 'Unirme' }).click();
   await expect(viewer).toHaveURL(/\/sesion\//);
   await expect(viewer.getByText('La otra persona no está compartiendo su ubicación ahora.')).toBeVisible();
 
   // 5. El código ya no sirve para nadie más.
   const stranger2 = await strangerCtx.newPage();
-  await stranger2.goto(`/unirse?codigo=${encodeURIComponent(codeText)}`);
+  await stranger2.goto(`${MONITOREO}#/unirse?codigo=${encodeURIComponent(codeText)}`);
   await stranger2.getByRole('button', { name: 'Unirme' }).click();
   await expect(stranger2.getByRole('alert')).toContainText('Invitación inválida o vencida');
 

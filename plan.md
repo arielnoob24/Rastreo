@@ -8,16 +8,47 @@ Crear una aplicación para compartir la ubicación en vivo con personas de confi
 - **Una persona puede monitorear a varias personas** a la vez (hasta 10) y verlas juntas en un mapa.
 - **La ubicación debe seguir enviándose con la pantalla bloqueada o con la aplicación en segundo plano.**
 
-La aplicación tiene **dos pantallas diferenciadas según el rol**:
+El proyecto son **dos aplicaciones distintas**, en el mismo repositorio, con links, iconos y colores propios:
 
-- **Pantalla de quien comparte**: inicia y detiene el envío, invita personas y decide quién puede verla.
-- **Pantalla de quien monitorea**: ve en un mapa a todas las personas que le comparten su ubicación.
+- **App de ubicación** (quien comparte): inicia y detiene el envío, entrega el código de invitación y decide quién puede verla.
+- **App de monitoreo** (quien observa): ingresa el código y ve en un mapa a las personas que le comparten su ubicación.
 
-Una misma persona puede tener los dos roles: compartir su ubicación y, a la vez, monitorear a otras.
+Una misma persona puede usar las dos: compartir su ubicación con una app y monitorear a otras con la otra.
 
 Además de la posición, se muestran la hora de la última actualización y, cuando el dispositivo la proporcione, la altitud. En términos geográficos, las coordenadas son **latitud** y **longitud**; la longitud no debe confundirse con la altitud.
 
-Publicación web: https://arielnoob24.github.io/Rastreo/ (GitHub Pages). Datos: Firebase, proyecto `rastreo-pareja-387e`.
+Publicación (GitHub Pages):
+
+| | Link |
+|---|---|
+| Portada (enlaza a las dos) | https://arielnoob24.github.io/Rastreo/ |
+| App de ubicación | https://arielnoob24.github.io/Rastreo/compartir/ |
+| App de monitoreo | https://arielnoob24.github.io/Rastreo/monitoreo/ |
+
+Datos: Firebase, proyecto `rastreo-pareja-387e`, compartido por las dos aplicaciones.
+
+## Dos aplicaciones en un repositorio
+
+| | App de ubicación | App de monitoreo |
+|---|---|---|
+| Carpeta | `apps/compartir` | `apps/monitoreo` |
+| Para quién | Quien comparte, desde su celular | Quien observa, desde PC o celular |
+| Color e icono | Verde azulado, pin de ubicación | Índigo, ojo |
+| Puede | Crear sesión, Iniciar/Detener, mostrar el código, revocar acceso, terminar sesión | Ingresar código, ver el mapa en vivo, salir de la sesión |
+| No puede | Ver la ubicación de otras personas | Enviar ubicación ni crear sesiones |
+| Distribución | Web (PWA) y, más adelante, APK con Capacitor para el segundo plano | Siempre web (PWA) |
+
+Organización del código:
+
+- `apps/compartir/` y `apps/monitoreo/`: pantallas, `index.html`, iconos y punto de entrada de cada app. Una app nunca importa código de la otra.
+- `shared/`: lo que usan ambas (conexión a Firebase, acceso a datos, ubicación, mapa, paneles, estilos base).
+- `firestore.rules`: una sola copia de las reglas, porque las dos apps usan la misma base de datos.
+- `vite.apps.ts`: configuración común; cada app tiene su build, manifiesto, service worker y scope propios, así que se instalan por separado.
+- `site/index.html`: portada con enlaces a las dos apps.
+- El enlace de invitación que genera la app de ubicación abre directamente la app de monitoreo en “unirse”.
+- Si alguien abre una sesión en la app que no le corresponde, se le ofrece abrirla en la otra.
+
+Se eligió un solo repositorio para no duplicar el código común ni las reglas de seguridad. Si se exigieran repositorios separados, cada app ya está en su propia carpeta.
 
 ## Tecnologías
 
@@ -25,7 +56,7 @@ Publicación web: https://arielnoob24.github.io/Rastreo/ (GitHub Pages). Datos: 
 |---|---|---|
 | Interfaz | React + TypeScript + Vite | Ecosistema amplio, buen soporte de herramientas y desarrollo rápido sin renderizado de servidor. |
 | App instalable | **Capacitor** (Android; iOS opcional) | Empaqueta la misma interfaz como app nativa. Es necesario para enviar la ubicación en segundo plano, algo que un navegador no permite. |
-| Web y PWA | `vite-plugin-pwa` | La pantalla de monitoreo también funciona en cualquier navegador, sin instalar nada. |
+| Web y PWA | `vite-plugin-pwa` | Cada app es una PWA independiente; la de monitoreo funciona en cualquier navegador, sin instalar nada. |
 | Mapa | Leaflet + React Leaflet | Varios marcadores, recorridos y círculos de precisión; liviano y cómodo en móvil. Respetar límites y atribución del proveedor de teselas. |
 | Ubicación en primer plano | `navigator.geolocation.watchPosition()` | Para la versión web mientras la página está abierta. |
 | Ubicación en segundo plano | Plugin de geolocalización en segundo plano de Capacitor | Sigue entregando posiciones con la pantalla bloqueada. En Android usa un servicio en primer plano con notificación fija. |
@@ -37,7 +68,7 @@ Se usa el plan gratuito de Firebase (Spark), sin Cloud Functions.
 
 ## Ubicación en segundo plano
 
-Un navegador (Chrome, Safari) suspende la página al bloquear la pantalla o cambiar de aplicación, y deja de entregar la ubicación. Por eso **quien comparte debe usar la app instalada**, no la página web.
+Un navegador (Chrome, Safari) suspende la página al bloquear la pantalla o cambiar de aplicación, y deja de entregar la ubicación. Por eso **la app de ubicación debe instalarse como app nativa** (APK); la de monitoreo no lo necesita.
 
 | | Android | iPhone |
 |---|---|---|
@@ -52,26 +83,25 @@ Limitaciones que hay que asumir y comunicar:
 - Algunos fabricantes (Xiaomi, Huawei, Samsung con ahorro extremo) cierran apps en segundo plano de forma agresiva; hay que probarlo en los teléfonos reales.
 - El envío en segundo plano consume más batería; usar el mismo límite de frecuencia (cada 5 s o 10 m como máximo) y permitir uno más espaciado cuando la persona está quieta.
 
-Quien **monitorea** no necesita instalar nada: la pantalla de monitoreo funciona en el navegador.
+Quien **monitorea** no necesita instalar nada: la app de monitoreo funciona en el navegador.
 
 > **Pendiente de decidir:** qué celulares usarán quienes comparten. Con Android se puede construir todo desde la PC; con iPhone hace falta una Mac.
 
 ## Pantallas
 
-### 1. Inicio
+### 1. Inicio de cada app
 
-- La primera vez: pedir **un nombre visible** (por ejemplo “Ariel”), necesario para distinguir a varias personas en el mapa. Se puede cambiar después.
-- Accesos a **Compartir mi ubicación** y **Monitorear**.
-- Campo para ingresar un código de invitación.
-- Aviso de privacidad: quién ve la ubicación, cuándo se comparte y cómo detenerlo.
+- **App de ubicación**: crear sesión (duración), volver a la sesión activa, aviso de privacidad y enlace a la app de monitoreo.
+- **App de monitoreo**: campo “Agregar persona con código”, volver a la última sesión vista y enlace a la app de ubicación.
+- Más adelante, la primera vez: pedir **un nombre visible** (por ejemplo “Ariel”), necesario para distinguir a varias personas en el mapa.
 
-### 2. Unirse
+### 2. Unirse (app de monitoreo)
 
 - Muestra quién invita (“Ariel quiere compartir su ubicación contigo”).
 - Requiere pulsar **Aceptar**: abrir el enlace no une a nadie automáticamente.
 - Al aceptar, esa persona aparece en la pantalla de monitoreo.
 
-### 3. Pantalla de quien comparte (`/compartir`)
+### 3. Sesión en la app de ubicación
 
 Pensada para el **celular** (app instalada).
 
@@ -83,7 +113,7 @@ Pensada para el **celular** (app instalada).
 - Duración opcional: compartir hasta que lo detenga, o durante 1, 4, 12 o 24 horas.
 - Aviso de que se detiene si se cierra la app a la fuerza o se apaga el celular.
 
-### 4. Pantalla de quien monitorea (`/monitorear`)
+### 4. Sesión en la app de monitoreo
 
 Pensada para **computadora o celular**, en el navegador o en la app. Solo lectura.
 
@@ -202,16 +232,18 @@ Los agentes deben limitar los cambios a su área, seguir las políticas de priva
 
 ## Estado actual y próximos pasos
 
-Hecho (versión web de pareja):
+Hecho (versión web para dos personas):
 
-- Inicio, unirse y una pantalla de sesión que cambia según el rol, para **dos personas**.
-- Firestore con reglas probadas, tiempo real y publicación en GitHub Pages.
+- **Dos aplicaciones separadas** con su propio link, icono, color y manifiesto: app de ubicación y app de monitoreo, más una portada.
+- App de ubicación: crear sesión, Iniciar/Detener, código de invitación automático, revocar acceso, terminar sesión.
+- App de monitoreo: unirse con código, mapa grande en tiempo real, última actualización destacada, salir.
+- Firestore con reglas probadas, tiempo real y publicación automática en GitHub Pages.
 
 Por hacer, en este orden:
 
 1. **Modelo de varias personas**: nombre visible, `shares` con `viewerIds`, invitaciones por persona, nuevas reglas y sus pruebas.
-2. **Pantallas separadas**: `/compartir` con lista de observadores y `/monitorear` con mapa de varias personas.
-3. **App Android con Capacitor** y ubicación en segundo plano; construir el APK.
+2. **Varias personas en cada app**: lista de observadores en la app de ubicación y mapa con varias personas en la de monitoreo.
+3. **App de ubicación para Android con Capacitor** y ubicación en segundo plano; construir el APK.
 4. Probar en los celulares reales, incluida la pantalla bloqueada.
 5. Decidir si se guarda el historial del recorrido y si se necesita iPhone.
 

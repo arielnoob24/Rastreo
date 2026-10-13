@@ -1,15 +1,18 @@
 ---
 name: pwa-y-diseno-adaptable
-description: Manifiesto, instalación, service worker, caché de recursos estáticos, accesibilidad y diseño responsive de las pantallas de compartir y monitorear. Úsala al tocar vite.config.ts, index.html, public/ o la maquetación.
+description: Manifiesto, instalación, service worker, caché de recursos estáticos, accesibilidad y diseño responsive de las pantallas de compartir y monitorear. Úsala al tocar vite.apps.ts, apps/*/index.html, apps/*/public/ o la maquetación.
 ---
 
 # PWA y diseño adaptable
 
-## Dónde corre la interfaz
+## Dos aplicaciones
 
-- **Navegador / PWA** (GitHub Pages, base `/Rastreo/`): sobre todo para quien monitorea.
-- **App Capacitor** (base `/`): para quien comparte, porque necesita el segundo plano. No registrar el service worker dentro de la app.
-- Usar siempre `import.meta.env.BASE_URL` para rutas y enlaces; nunca rutas absolutas fijas.
+- **App de ubicación** (`apps/compartir`, `/Rastreo/compartir/`): para quien comparte. Más adelante se empaqueta con Capacitor para el segundo plano (sin service worker dentro de la app nativa).
+- **App de monitoreo** (`apps/monitoreo`, `/Rastreo/monitoreo/`): para quien observa, siempre web.
+- Cada una tiene su build, manifiesto (`id`, `scope` y `start_url` propios), service worker, icono y color; se instalan por separado. Ambas salen de `appConfig()` en `vite.apps.ts`.
+- Portada del sitio en `site/index.html`, con enlaces a las dos.
+- Rutas con `HashRouter` (`#/sesion/...`): funcionan en GitHub Pages y en Capacitor sin reescrituras.
+- Para enlazar una app con la otra usar `shared/lib/appLinks.ts` (por ejemplo, el enlace de invitación abre la app de monitoreo); nunca rutas fijas.
 
 ## Manifiesto e instalación
 
@@ -26,8 +29,8 @@ description: Manifiesto, instalación, service worker, caché de recursos estát
 ## Diseño adaptable
 
 - Mobile-first.
-- **Compartir** (`/compartir`): botón **Iniciar/Detener** grande (mínimo 56 px de alto) y estado visibles sin desplazarse; debajo, observadores e invitar.
-- **Monitorear** (`/monitorear`): en celular, mapa arriba y lista de personas deslizable abajo; en pantallas de 900 px o más, lista a un lado y mapa ocupando el resto.
+- **App de ubicación**: botón **Iniciar/Detener** grande (mínimo 56 px de alto) y estado visibles sin desplazarse; debajo, observadores e invitar.
+- **App de monitoreo**: en celular, mapa arriba y lista de personas deslizable abajo; en pantallas de 900 px o más, lista a un lado y mapa ocupando el resto.
 - Objetivos táctiles de al menos 44×44 px. Respetar `env(safe-area-inset-*)`.
 - Modo claro y oscuro con tokens de color; los colores de las personas deben verse bien en ambos.
 

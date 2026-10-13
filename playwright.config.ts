@@ -1,6 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 
-// Las pruebas E2E corren contra el build de producción (vite preview) para incluir el service worker.
+// Pruebas E2E contra el build de producción (portada + las dos apps, con sus service workers).
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
@@ -14,9 +14,9 @@ export default defineConfig({
     { name: 'movil', use: { ...devices['Pixel 7'] } },
   ],
   webServer: {
-    command: 'npm run build && npm run preview -- --port 4173 --strictPort',
+    command: 'npm run build && npm run preview',
     url: 'http://localhost:4173',
     reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
+    timeout: 180_000,
   },
 });

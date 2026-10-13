@@ -1,9 +1,10 @@
-import { useState, type FormEvent } from 'react';
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { createSession } from '../api/sessions';
-import { PrivacyNotice } from '../components/PrivacyNotice';
-import { recentSession, rememberSession } from '../lib/recentSession';
-import { ensureSignedIn, isFirebaseConfigured } from '../lib/firebase';
+import { createSession } from '@shared/api/sessions';
+import { PrivacyNotice } from '@shared/components/PrivacyNotice';
+import { monitoreoUrl } from '@shared/lib/appLinks';
+import { ensureSignedIn, isFirebaseConfigured } from '@shared/lib/firebase';
+import { recentSession, rememberSession } from '@shared/lib/recentSession';
 
 const DURATIONS = [
   { minutes: 60, label: '1 hora' },
@@ -15,10 +16,9 @@ const DURATIONS = [
 export function HomePage() {
   const navigate = useNavigate();
   const [duration, setDuration] = useState(240);
-  const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const recent = recentSession();
+  const recent = recentSession('compartir');
 
   const onCreate = async () => {
     setBusy(true);
@@ -26,7 +26,7 @@ export function HomePage() {
     try {
       await ensureSignedIn();
       const session = await createSession(duration);
-      rememberSession(session.id);
+      rememberSession('compartir', session.id);
       navigate(`/sesion/${session.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo crear la sesión');
@@ -35,16 +35,11 @@ export function HomePage() {
     }
   };
 
-  const onJoin = (event: FormEvent) => {
-    event.preventDefault();
-    const trimmed = code.trim();
-    if (trimmed) navigate(`/unirse?codigo=${encodeURIComponent(trimmed)}`);
-  };
-
   return (
-    <main className="page page--narrow">
+    <main className="page page--narrow app-home">
       <header className="hero">
-        <h1>Rastreo en pareja</h1>
+        <span className="app-badge">App de ubicación</span>
+        <h1>Rastreo · Compartir</h1>
         <p>Comparte tu ubicación en vivo con una persona de confianza, solo mientras tú lo decidas.</p>
       </header>
 
@@ -59,15 +54,15 @@ export function HomePage() {
       ) : null}
 
       {recent ? (
-        <p>
-          <Link to={`/sesion/${recent}`}>Volver a mi última sesión</Link>
-        </p>
+        <Link className="btn btn--ghost" to={`/sesion/${recent}`}>
+          Volver a mi sesión
+        </Link>
       ) : null}
 
       <section className="card" aria-labelledby="crear">
-        <h2 id="crear">Compartir mi ubicación</h2>
+        <h2 id="crear">Nueva sesión</h2>
         <label className="field">
-          <span>Duración máxima de la sesión</span>
+          <span>Duración máxima</span>
           <select value={duration} onChange={(e) => setDuration(Number(e.target.value))}>
             {DURATIONS.map((d) => (
               <option key={d.minutes} value={d.minutes}>
@@ -79,30 +74,15 @@ export function HomePage() {
         <button type="button" className="btn" onClick={onCreate} disabled={busy || !isFirebaseConfigured}>
           {busy ? 'Creando…' : 'Crear sesión'}
         </button>
+        <p className="muted">Al crearla verás el código para la otra persona.</p>
         {error ? <p role="alert" className="error-text">{error}</p> : null}
       </section>
 
-      <section className="card" aria-labelledby="unirse">
-        <h2 id="unirse">Ver la ubicación de alguien</h2>
-        <form onSubmit={onJoin} className="join-form">
-          <label className="field">
-            <span>Código de invitación</span>
-            <input
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              autoComplete="off"
-              autoCapitalize="characters"
-              spellCheck={false}
-              placeholder="ABCD-EFGH-JKLM"
-            />
-          </label>
-          <button type="submit" className="btn btn--ghost" disabled={!code.trim()}>
-            Continuar
-          </button>
-        </form>
-      </section>
-
       <PrivacyNotice />
+
+      <p className="muted other-app">
+        ¿Quieres ver la ubicación de alguien? Usa la <a href={monitoreoUrl()}>app de monitoreo</a>.
+      </p>
     </main>
   );
 }
