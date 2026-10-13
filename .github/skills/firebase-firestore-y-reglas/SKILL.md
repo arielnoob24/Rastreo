@@ -35,6 +35,6 @@ description: Modelo de datos en Firestore (sesiones, invitaciones, última ubica
 
 ## Expiración
 
-- Políticas TTL sobre `expiresAt` en `sessions`, `invitations` y `locations` (en `firestore.indexes.json`, o desde la consola de Firestore).
+- Las políticas TTL sobre `expiresAt` requieren facturación (Blaze); el proyecto actual no la tiene, así que `firestore.indexes.json` no las declara.
 - El TTL borra con retraso (puede tardar horas): las reglas ya comprueban `expiresAt > request.time`, así que un dato vencido no es legible.
 - Sin Cloud Functions no hay borrado en el servidor si el teléfono desaparece sin pulsar Detener: la ubicación queda ilegible (`sharing` sigue verdadero pero la sesión vence) hasta el TTL. Documentarlo.

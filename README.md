@@ -4,6 +4,10 @@ PWA para que dos personas compartan una sesión de ubicación en vivo. Quien com
 
 El plan completo está en [plan.md](plan.md).
 
+**App publicada:** https://arielnoob24.github.io/Rastreo/ (se vuelve a publicar sola con cada `git push` a `main`, mediante `.github/workflows/pages.yml`).
+
+Proyecto de Firebase: `rastreo-pareja-387e` ([consola](https://console.firebase.google.com/project/rastreo-pareja-387e/overview)). La configuración web está en las variables del repositorio (Settings → Secrets and variables → Actions → Variables) y en `.env.local` para desarrollo.
+
 ## Tecnologías
 
 React + TypeScript + Vite, `vite-plugin-pwa`, Leaflet, **Firebase** (Auth anónima, Firestore, Hosting), Vitest, Testing Library y Playwright.
@@ -61,7 +65,7 @@ src/
   hooks/useGeolocationWatch  watchPosition()/clearWatch() con estados de permiso
   components/ pages/         Interfaz
 firestore.rules              Reglas de seguridad
-firestore.indexes.json       Políticas TTL de expiración
+firestore.indexes.json       Índices (y TTL si se activa la facturación)
 rules-test/                  Pruebas de las reglas
 e2e/ e2e-flow/               Pruebas de navegador
 .github/agents/ skills/      Agentes y skills del plan
@@ -75,7 +79,7 @@ docs/pruebas-dispositivos.md Registro de pruebas en celulares reales
 - Los códigos de invitación son aleatorios (12 caracteres), de un solo uso y vencen; en Firestore solo existe su hash SHA-256.
 - Las reglas impiden leer la ubicación si no se está compartiendo, si la sesión terminó o venció, o si no eres integrante.
 - Si la página se recarga mientras se compartía, la sesión se pausa: nunca se reanuda sin pulsar **Iniciar**.
-- Sin Cloud Functions: si el teléfono se apaga sin pulsar Detener, la última posición queda ilegible al vencer la sesión y se elimina con la política TTL (puede tardar horas).
+- Sin Cloud Functions ni facturación: si el teléfono se apaga sin pulsar Detener, la última posición queda guardada pero las reglas la hacen ilegible al vencer la sesión. Las políticas TTL de borrado automático requieren activar la facturación (plan Blaze); si se activa, añádelas en `firestore.indexes.json` (`fieldOverrides` con `"ttl": true` sobre `expiresAt`).
 - No se garantiza el seguimiento con la pantalla bloqueada o la app cerrada; registra lo observado en `docs/pruebas-dispositivos.md`.
 
 ## Mapa
