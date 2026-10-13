@@ -1,0 +1,165 @@
+rules_version = '2';
+
+// Rastreo en pareja. Modelo:
+//   sessions/{sid}      sesión de dos personas (dueño, visor, estado, vencimiento, latidos de presencia)
+//   invitations/{hash}  invitación de un solo uso; el ID es el SHA-256 del código (nunca el código)
+//   locations/{sid}     solo la ÚLTIMA ubicación de la sesión
+// Todo lo que no se permita aquí está denegado.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function sessionPath(sid) {
+      return /databases/$(database)/documents/sessions/$(sid);
+    }
+
+    function invitationPath(hash) {
+      return /databases/$(database)/documents/invitations/$(hash);
+    }
+
+    // Sesión vigente: no terminada y no vencida.
+    function live(s) {
+      return s.endedAt == null && s.expiresAt > request.time;
+    }
+
+    // ---------------------------------------------------------------- sesiones
+    match /sessions/{sid} {
+
+      allow read: if signedIn()
+        && (resource.data.ownerId == request.auth.uid || resource.data.viewerId == request.auth.uid);
+
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(
+             ['ownerId', 'viewerId', 'sharing', 'createdAt', 'expiresAt', 'endedAt', 'inviteHash', 'ownerSeen', 'viewerSeen'])
+        && request.resource.data.keys().hasAll(
+             ['ownerId', 'viewerId', 'sharing', 'createdAt', 'expiresAt', 'endedAt', 'inviteHash', 'ownerSeen', 'viewerSeen'])
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.viewerId == null
+        && request.resource.data.sharing == false
+        && request.resource.data.endedAt == null
+        && request.resource.data.inviteHash == null
+        && request.resource.data.ownerSeen == null
+        && request.resource.data.viewerSeen == null
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.expiresAt is timestamp
+        && request.resource.data.expiresAt > request.time
+        && request.resource.data.expiresAt <= request.time + duration.value(1500, 'm');
+
+      allow update: if signedIn() && (ownerUpdate() || viewerUpdate() || joinUpdate());
+
+      // Dueño: iniciar/detener, terminar, quitar al visor, publicar su invitación y latido.
+      function ownerUpdate() {
+        let r = resource.data;
+        let n = request.resource.data;
+        return r.ownerId == request.auth.uid
+          && live(r)
+          && n.diff(r).affectedKeys().hasOnly(['sharing', 'endedAt', 'viewerId', 'viewerSeen', 'inviteHash', 'ownerSeen'])
+          && (n.endedAt == null || (n.endedAt == request.time && n.sharing == false))
+          && (n.viewerId == r.viewerId || n.viewerId == null)
+          && (n.inviteHash == r.inviteHash || r.viewerId == null)
+          && (n.viewerSeen == r.viewerSeen || n.viewerSeen == null)
+          && (n.ownerSeen == r.ownerSeen || n.ownerSeen == null || n.ownerSeen == request.time);
+      }
+
+      // Visor: salir de la sesión y latido de presencia.
+      function viewerUpdate() {
+        let r = resource.data;
+        let n = request.resource.data;
+        return r.viewerId == request.auth.uid
+          && live(r)
+          && n.diff(r).affectedKeys().hasOnly(['viewerId', 'viewerSeen'])
+          && (n.viewerId == request.auth.uid || n.viewerId == null)
+          && (n.viewerSeen == r.viewerSeen || n.viewerSeen == null || n.viewerSeen == request.time);
+      }
+
+      // Persona invitada: se une solo si, en el MISMO lote, marca como usada la invitación vigente de la sesión.
+      function joinUpdate() {
+        let r = resource.data;
+        let n = request.resource.data;
+        return r.viewerId == null
+          && r.ownerId != request.auth.uid
+          && live(r)
+          && r.inviteHash != null
+          && n.diff(r).affectedKeys().hasOnly(['viewerId'])
+          && n.viewerId == request.auth.uid
+          && get(invitationPath(r.inviteHash)).data.usedAt == null
+          && getAfter(invitationPath(r.inviteHash)).data.usedBy == request.auth.uid;
+      }
+    }
+
+    // ------------------------------------------------------------ invitaciones
+    match /invitations/{hash} {
+
+      // Solo lectura por ID exacto (hay que conocer el código); no se puede listar.
+      allow get: if signedIn();
+
+      allow create: if signedIn()
+        && hash.matches('[0-9a-f]{64}')
+        && request.resource.data.keys().hasOnly(['sessionId', 'ownerId', 'createdAt', 'expiresAt', 'usedAt', 'usedBy'])
+        && request.resource.data.keys().hasAll(['sessionId', 'ownerId', 'createdAt', 'expiresAt', 'usedAt', 'usedBy'])
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.usedAt == null
+        && request.resource.data.usedBy == null
+        && request.resource.data.expiresAt is timestamp
+        && request.resource.data.expiresAt > request.time
+        && request.resource.data.expiresAt <= request.time + duration.value(1500, 'm')
+        && get(sessionPath(request.resource.data.sessionId)).data.ownerId == request.auth.uid
+        && get(sessionPath(request.resource.data.sessionId)).data.viewerId == null
+        && live(get(sessionPath(request.resource.data.sessionId)).data)
+        && request.resource.data.expiresAt <= get(sessionPath(request.resource.data.sessionId)).data.expiresAt;
+
+      // Aceptar: una sola vez, antes de vencer, y enlazada al cambio de viewerId de la sesión.
+      allow update: if signedIn()
+        && resource.data.usedAt == null
+        && resource.data.expiresAt > request.time
+        && resource.data.ownerId != request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['usedAt', 'usedBy'])
+        && request.resource.data.usedBy == request.auth.uid
+        && request.resource.data.usedAt == request.time
+        && get(sessionPath(resource.data.sessionId)).data.inviteHash == hash
+        && get(sessionPath(resource.data.sessionId)).data.viewerId == null
+        && live(get(sessionPath(resource.data.sessionId)).data)
+        && getAfter(sessionPath(resource.data.sessionId)).data.viewerId == request.auth.uid;
+    }
+
+    // ------------------------------------------------------------- ubicaciones
+    match /locations/{sid} {
+
+      // Solo integrantes, con la sesión vigente y mientras el dueño esté compartiendo.
+      allow read: if signedIn()
+        && live(get(sessionPath(sid)).data)
+        && get(sessionPath(sid)).data.sharing == true
+        && (get(sessionPath(sid)).data.ownerId == request.auth.uid
+            || get(sessionPath(sid)).data.viewerId == request.auth.uid);
+
+      // Solo el dueño publica, y solo si pulsó Iniciar.
+      allow create, update: if signedIn()
+        && get(sessionPath(sid)).data.ownerId == request.auth.uid
+        && get(sessionPath(sid)).data.sharing == true
+        && live(get(sessionPath(sid)).data)
+        && request.resource.data.keys().hasOnly(
+             ['latitude', 'longitude', 'accuracy', 'altitude', 'altitudeAccuracy', 'capturedAt', 'updatedAt', 'expiresAt'])
+        && request.resource.data.keys().hasAll(
+             ['latitude', 'longitude', 'accuracy', 'altitude', 'altitudeAccuracy', 'capturedAt', 'updatedAt', 'expiresAt'])
+        && request.resource.data.latitude is number
+        && request.resource.data.latitude >= -90 && request.resource.data.latitude <= 90
+        && request.resource.data.longitude is number
+        && request.resource.data.longitude >= -180 && request.resource.data.longitude <= 180
+        && (request.resource.data.accuracy == null
+            || (request.resource.data.accuracy is number && request.resource.data.accuracy >= 0))
+        && (request.resource.data.altitude == null || request.resource.data.altitude is number)
+        && (request.resource.data.altitudeAccuracy == null
+            || (request.resource.data.altitudeAccuracy is number && request.resource.data.altitudeAccuracy >= 0))
+        && request.resource.data.capturedAt is timestamp
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.expiresAt == get(sessionPath(sid)).data.expiresAt;
+
+      allow delete: if signedIn()
+        && get(sessionPath(sid)).data.ownerId == request.auth.uid;
+    }
+  }
+}
